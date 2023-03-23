@@ -1,0 +1,174 @@
+# IMPORTANDO BIBLIOTECAS
+
+import MySQLdb as MS
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# CONECTANDO O PYTHON AO MYSQL
+
+host = "localhost"
+user = "user"
+password = "password"
+db = "education_numbers"
+port = 3306
+
+con = MS.connect (host, user, password, db, port) #CONEXÃO DO PYTHON COM O BANCO DE DADOS
+c = con.cursor(MS.cursors.DictCursor) #CURSOR DO BANCO DE DADOS EM FORMA DE DICIONÁRIO
+
+# LENDO O DATASET
+
+x = pd.read_csv(r'C:\Users\carlo\Desktop\PYTHON\DATASETS\Education_Indicators_2014_2.csv')
+dados = pd.DataFrame(x)
+
+# MECANISMO DE INSERÇÃO DE DADOS
+
+def insert_data(values, table):
+    
+    global c, con #CONSULTA E ALTERAÇÕES NO BANCO DE DADOS
+    
+    query = "INSERT INTO " + table
+    query = query + " VALUES " + ",".join(["(" + v + ")" for v in values]) 
+    
+    c.execute(query) #EXECUTAR A BUSCA/CONSULTA
+    con.commit() #REALIZAR AS ALTERAÇÕES NO DB
+
+
+# INSERINDO DADOS NA TABELA DE INFORMAÇÕES GERAIS
+
+for linha in range (len(dados['Country Name'])):
+    values1 = ["DEFAULT, '{0}', {1}, {2}, {3}".format(dados['Country Name'][linha], dados['PPT'][linha], dados['GDP'][linha], dados['LEB'][linha])]
+    insert_data(values1, "general_informations")
+
+
+# INSERINDO DADOS NA TABELA DE INFORMAÇÕES DE ENSINO PRIMÁRIO
+
+for linha1 in range (len(dados['Country Name'])):
+    values2 = ["DEFAULT, '{0}', {1}, {2}, {3}, {4}".format(dados['Country Name'][linha1], dados['PRPE'][linha1], dados['OOCP'][linha1], dados['EPE'][linha1], dados['TDP'][linha1])]
+    insert_data(values2, "primary_education")
+
+
+# INSERINDO DADOS NA TABELA DE INFORMAÇÕES DE ENSINO SECUNDÁRIO
+
+for linha2 in range (len(dados['Country Name'])):
+    values3 = ["DEFAULT, '{0}', {1}".format(dados['Country Name'][linha2], dados['ESE'][linha2])]
+    insert_data(values3, "secondary_education")
+
+
+# INSERINDO DADOS NA TABELA DE INFORMAÇÕES DE DESEMPREGO
+
+for linha3 in range (len(dados['Country Name'])):
+    values4 = ["DEFAULT, '{0}', {1}".format(dados['Country Name'][linha3], dados['UNEMP'][linha3])]
+    insert_data(values4, "unemployment")
+    
+#______________________________________________________________________________
+    
+# ANÁLISE ESTATÍSTICA
+
+        # MECANISMO DE BUSCA
+
+def select1(fields1, tables1, order=None, where=None):
+    
+    global c # CONSULTA NO BANCO DE DADOS
+    
+    query1 = "SELECT " + fields1 + " FROM " + tables1
+    if(where):
+        query1 = query1 + " WHERE " + where
+    if(order):
+        query1 = query1 + " ORDER BY " + order + " DESC"
+        
+    c.execute (query1)
+        
+    return c.fetchall()
+
+        # MECANISMO GRÁFICO
+
+def graph(datax, data1, data2, eixox, eixoy1, eixoy2):
+    
+    datax=datax[0:10]
+    data1 = data1[0:10]
+    
+    fig, ax1 = plt.subplots()  
+      
+    ax1.set_xlabel('{0}'.format(eixox))  
+    ax1.set_ylabel('{0}'.format(eixoy1), color = 'tab:green')  
+    ax1.bar(datax, data1, color = 'tab:green')
+    plt.xticks(fontsize = 9, rotation=90)
+    ax1.tick_params(axis ='y', labelcolor = 'tab:green')  
+    ax2 = ax1.twinx()  
+      
+    ax2.set_ylabel('{0}'.format(eixoy2), color = 'tab:orange')  
+    ax2.plot(datax, data2, marker = "o", color = 'tab:orange')  
+    ax2.tick_params(axis ='y', labelcolor = 'tab:orange')  
+    
+    plt.show()
+
+
+     # GDP X PRPE (10 melhores)
+
+        # GDP
+
+COUNTRYs = []
+GDPs = []
+
+resultado1 = select1("GDP, Country Name", "general_informations", "GDP", None)
+
+for i in range (len(dados["Country Name"])):
+    Country_i = resultado1[i]["Name"]
+    GDP_i = resultado1[i]["GDP"]
+    
+    COUNTRYs.append(Country_i)
+    GDPs.append(GDP_i)
+
+        # PRPE
+
+PRPEs = []
+
+for k in range(10):
+    Country_k = COUNTRYs[k]
+    resultado2 = select1("primary_education_repeaters", "primary_education", None, "primary_education_country='{0}'".format(Country_k))
+    PRPE_i = resultado2[0]["primary_education_repeaters"]
+    PRPEs.append(PRPE_i)
+
+        # CONSTRUÇÃO GRÁFICA
+graph(COUNTRYs, GDPs, PRPEs, 'Country', 'GDP', 'PRPE')
+
+    # GDP X UNEMP (10 melhores)
+
+        # GDP JÁ EXPLORADA ANTERIORMENTE
+
+        # UNEMP
+
+UNEMPs = []
+
+for h in range(10):
+    Country_h = COUNTRYs[h]
+    resultado3 = select1("unemployment_percent", "unemployment", None, "unemployment_country='{0}'".format(Country_h))
+    UNEMP_i = resultado3[0]["unemployment_percent"]
+    UNEMPs.append(UNEMP_i)
+
+        # CONSTRUÇÃO GRÁFICA
+graph(COUNTRYs, GDPs, UNEMPs, 'Country', 'GDP', 'UNEMP')
+
+
+    # RELAÇÃO EPE X OOCP (10 melhores GDPs)
+    
+        # GDP JÁ EXPLORADA ANTERIORMENTE
+
+        # EPE E OOCP
+
+EPE_OOCP = [] 
+
+for k in range(10):
+    Country_k = COUNTRYs[k]
+    resultado5 = select1("primary_education_enrolment", "primary_education", None, "primary_education_country='{0}'".format(Country_k))
+    resultado6 = select1("primary_education_out_school", "primary_education", None, "primary_education_country='{0}'".format(Country_k))
+    EPE_i = resultado5[0]["primary_education_enrolment"]
+    OOCP_i = resultado6[0]["primary_education_out_school"]
+    EPE_OOCP.append(EPE_i/OOCP_i)
+
+        # CONSTRUÇÃO GRÁFICA
+plt.plot((COUNTRYs[0:10]), EPE_OOCP, marker='o', color = 'tab:blue')
+plt.xlabel('{0}'.format('Country'))  
+plt.ylabel('{0}'.format('Children enrolled in primary education / Child out of school in primary school'))   
+plt.xticks(fontsize = 10, rotation=90)
+plt.show()
